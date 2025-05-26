@@ -16,6 +16,7 @@ import ProfileIcon from '../assets/svg_wrapper/profile_icon.wrapper';
 import firestore from '@react-native-firebase/firestore';
 import LinearGradient from 'react-native-linear-gradient';
 import BackIcon from '../assets/svg_wrapper/back_icon.wrapper';
+import auth from '@react-native-firebase/auth';
 
 const ProfileScreen = () => {
   const [name, setName] = useState('');
@@ -25,33 +26,79 @@ const ProfileScreen = () => {
   const [openModal, setopenModal] = useState(false);
   const navigation = useNavigation();
 
-  const addContact = async () => {
-    if (!name || !phone || !email) {
-      return Alert.alert('Error', 'Fill all fields');
-    }
+  // const addContact = async () => {
+  //   if (!name || !phone || !email) {
+  //     return Alert.alert('Error', 'Fill all fields');
+  //   }
 
-    const newContact = { name, phone, email };
-    await firestore().collection('emergencyContacts').add(newContact);
-    fetchContacts();
-    setName('');
-    setPhone('');
-    setEmail('');
-    setopenModal(false); // close modal after adding
-    Alert.alert('Emergency', 'Contact Added');
+  //   const newContact = { name, phone, email };
+  //   await firestore().collection('emergencyContacts').add(newContact);
+  //   fetchContacts();
+  //   setName('');
+  //   setPhone('');
+  //   setEmail('');
+  //   setopenModal(false); // close modal after adding
+  //   Alert.alert('Emergency', 'Contact Added');
+  // };
+const addContact = async () => {
+  if (!name || !phone || !email) {
+    return Alert.alert('Error', 'Fill all fields');
+  }
+
+  const currentUser = auth().currentUser;
+  if (!currentUser) {
+    return Alert.alert('Error', 'User not logged in');
+  }
+
+  const newContact = {
+    name,
+    phone,
+    email,
+    userId: currentUser.uid, 
   };
 
-  const fetchContacts = async () => {
-    try {
-      const snapshot = await firestore().collection('emergencyContacts').get();
-      const contactsList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setContacts(contactsList);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load contacts');
+  await firestore().collection('emergencyContacts').add(newContact);
+  fetchContacts();
+  setName('');
+  setPhone('');
+  setEmail('');
+  setopenModal(false);
+  Alert.alert('Emergency', 'Contact Added');
+};
+
+  // const fetchContacts = async () => {
+  //   try {
+  //     const snapshot = await firestore().collection('emergencyContacts').get();
+  //     const contactsList = snapshot.docs.map(doc => ({
+  //       id: doc.id,
+  //       ...doc.data(),
+  //     }));
+  //     setContacts(contactsList);
+  //   } catch (error) {
+  //     Alert.alert('Error', 'Failed to load contacts');
+  //   }
+  // };
+const fetchContacts = async () => {
+  try {
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      return Alert.alert('Error', 'User not logged in');
     }
-  };
+
+    const snapshot = await firestore()
+      .collection('emergencyContacts')
+      .where('userId', '==', currentUser.uid) // 🔒 only this user's contacts
+      .get();
+
+    const contactsList = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setContacts(contactsList);
+  } catch (error) {
+    Alert.alert('Error', 'Failed to load contacts');
+  }
+};
 
   const deleteContact = (id) => {
     Alert.alert(

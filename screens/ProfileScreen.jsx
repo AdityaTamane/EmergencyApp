@@ -22,6 +22,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import BackIcon from '../assets/svg_wrapper/back_icon.wrapper';
 import ContactsIcon from '../assets/svg_wrapper/contacts_icon.wrapper';
 import MySvgComponent from '../components/mySvgComponent';
+import auth from '@react-native-firebase/auth'; // Only if using Firebase auth
+import { CommonActions } from '@react-navigation/native';
 
 const permissionMap = {
   location: Platform.select({
@@ -87,6 +89,20 @@ const ProfileScreen = () => {
     checkPermissions();
   }, []);
 
+  const handleLogout = async () => {
+  try {
+    await auth().signOut();
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      })
+    );
+  } catch (error) {
+    console.error('Logout Error:', error);
+    Alert.alert('Error', 'Something went wrong during logout.');
+  }
+};
   return (
     <LinearGradient colors={['#EF4444', '#850505']} style={styles.container}>
         <View style={styles.Header}>
@@ -119,7 +135,7 @@ const ProfileScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.logout} onPress={() => navigation.navigate('Login')}>
+      <TouchableOpacity style={styles.logout} onPress={handleLogout}>
           <Text style={styles.linkText}>Logout</Text>
         </TouchableOpacity>
       </SafeAreaView>

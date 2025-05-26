@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Image, TouchableOpacity, Linking, Alert, Platform, ScrollView, PermissionsAndroid, Switch} from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, Linking, Alert, Platform, ScrollView, PermissionsAndroid, Switch,ActivityIndicator, Modal} from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
@@ -17,6 +17,8 @@ import ContactsIcon from '../assets/svg_wrapper/contacts_icon.wrapper';
 const HomeScreen = () => {
   const [isVideoMode, setIsVideoMode] = useState(false); 
   const [location, setLocation] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   const navigation = useNavigation();
 
   const handleSOSPress = () => {
@@ -128,6 +130,7 @@ const handleReportIncident = async () => {
     Alert.alert('Permission Required', 'Camera permission is required to report an incident.');
     return;
   }
+
   const result = await launchCamera({
     mediaType: isVideoMode ? 'video' : 'photo',
     videoQuality: 'high',
@@ -146,6 +149,8 @@ const handleReportIncident = async () => {
     return;
   }
 
+  setLoading(true); 
+
   const uri = Platform.OS === 'android' ? asset.uri.replace('file://', '') : asset.uri;
   const fileName = `${Date.now()}.${isVideoMode ? 'mp4' : 'jpg'}`;
   const storagePath = `incidents/${fileName}`;
@@ -154,28 +159,24 @@ const handleReportIncident = async () => {
   try {
     await reference.putFile(uri);
     const downloadUrl = await reference.getDownloadURL();
-    console.log(`${isVideoMode ? 'Video' : 'Image'} uploaded:`, downloadUrl);
-    // Alert.alert('Success', `${isVideoMode ? 'Video' : 'Image'} uploaded successfully!`);
 
-    // Get emergency contact emails
     const snapshot = await firestore().collection('emergencyContacts').get();
     const emails = snapshot.docs.map(doc => doc.data().email).join(',');
 
-    // Get location
     const location = await getlocation();
     const { latitude, longitude } = location.coords;
     const mapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
 
-    // Compose email
     const subject = 'Emergency Incident Reported';
     const body = `An incident has been reported.\n\nIncident View Link: \n${downloadUrl}\n \nAccess the Location from: \n${mapsLink}\n\nPlease take necessary action.`;
     const emailUrl = `mailto:${emails}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
     Linking.openURL(emailUrl);
-
   } catch (error) {
     console.error('Upload or email failed:', error);
     Alert.alert('Upload Failed', error.message || 'Something went wrong while uploading media or sending email.');
+  } finally {
+    setLoading(false); // Stop loader
   }
 };
   return (
@@ -202,7 +203,14 @@ const handleReportIncident = async () => {
           <Marker coordinate={{ latitude: 37.78825, longitude: -122.4324 }} />
         </MapView> */}
 
-        {location && (
+        {!location ? (
+          <View style={styles.map}>
+          <Text style={{ color: '#fff', textAlign: 'center', marginTop:'40%'}}>
+            Fetching location...
+          <ActivityIndicator size="large" color="#fff" style={styles.indicator} />
+          </Text>
+          </View>
+        ) : (
           <MapView
             style={styles.map}
             showsUserLocation={true}
@@ -251,6 +259,13 @@ const handleReportIncident = async () => {
         </SafeAreaView>
       </LinearGradient>
       </ScrollView>
+      <Modal visible={loading} transparent={true} animationType="fade">
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>Processing...</Text>
+        </View>
+      </Modal>
+
     </>
   );
 };
@@ -366,4 +381,18 @@ filterButtonText: {
 filterButtonTextActive: {
   color: '#fff',
 },
+ loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#fff',
+    fontSize: 16,
+  },
+  indicator:{
+    marginTop:20
+  }
 });
